@@ -98,25 +98,19 @@ public class WebSocketEventClient {
         if (code == 1000) {
             System.out.println("WebSocket closed normally.");
         }
-
-        // Set reconnecting flag to true
-        isReconnecting = true;
-
+        
         reconnectTimer = new Timer();
         reconnectTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 if (!webSocketClient.isOpen()) {
                     System.out.println("Attempting to reconnect...");
+                    isReconnecting = true;
                     webSocketClient.reconnect();
-                } else if (webSocketClient.isOpen()) {
+                } else {
                     reconnectTimer.cancel();
                     isReconnecting = false; // Reset reconnecting flag when connection is reestablished
                     System.out.println("WebSocket reconnected.");
-                } else {                     
-                    reconnectTimer.cancel();
-                    isReconnecting = false; // Reset reconnecting flag when user closes the connection
-                    System.out.println("WebSocket connection closed.");
                 }
             }
         }, 0, 5000);
