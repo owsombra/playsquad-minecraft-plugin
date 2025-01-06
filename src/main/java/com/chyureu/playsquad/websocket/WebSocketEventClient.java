@@ -22,6 +22,11 @@ public class WebSocketEventClient {
     private WebSocketClient webSocketClient;
     private final String WEBSOCKET_BASE_URI = "wss://playsquad.gg/ws/event/?token=";
 
+    private Timer heartbeatTimer;
+
+    private Timer reconnectTimer;
+    private boolean isReconnecting = false;
+
     // Constructor to establish WebSocket connection
     public WebSocketEventClient() {
         try {
@@ -35,14 +40,18 @@ public class WebSocketEventClient {
                     // WebSocket connection established
                     System.out.println("WebSocket connection established.");
 
-                    // Set up a timer to send heartbeat messages periodically
-                    Timer timer = new Timer();
-                    timer.schedule(new TimerTask() {
+                    if (heartbeatTimer != null) {
+                        heartbeatTimer.cancel();
+                    }
+
+                    // Set up a timer to send heartbeat messages periodically  
+                    heartbeatTimer = new Timer();
+                    heartbeatTimer.scheduleAtFixedRate(new TimerTask() {
                         @Override
                         public void run() {
                             sendHeartbeat();
                         }
-                    }, 0, 59000); // Send heartbeat every 59 seconds
+                    }, 0, 10000); // Send heartbeat every 10 seconds
                 }
 
                 @Override
@@ -52,14 +61,19 @@ public class WebSocketEventClient {
                 }
 
                 @Override
-                public void onClose(int i, String s, boolean b) {
-                    // WebSocket connection closed
+                public void onClose(int code, String s, boolean b) {
                     System.out.println("WebSocket connection closed.");
+
+                    // Reconnect to the WebSocket server
+                    reconnectWebSocket(code);
                 }
 
                 @Override
                 public void onError(Exception e) {
-                    // Handle WebSocket errors
+                    System.out.println("WebSocket connection error.");
+
+                    // Reconnect to the WebSocket server with code -1 (unclear status)
+                    reconnectWebSocket(-1);
                     e.printStackTrace();
                 }
             };
@@ -70,6 +84,42 @@ public class WebSocketEventClient {
             // Handle exceptions
             e.printStackTrace();
         }
+    }
+
+    // Reconnect to the WebSocket server
+    // code => -1: Status Code is unclear
+    // code => 1000 : Normal closure
+    private void reconnectWebSocket(int code) {
+        if (isReconnecting) {
+            System.out.println("Already reconnecting, skipping reconnect attempt.");
+            return;
+        }
+
+        if (code == 1000) {
+            System.out.println("WebSocket closed normally.");
+        }
+
+        // Set reconnecting flag to true
+        isReconnecting = true;
+
+        reconnectTimer = new Timer();
+        reconnectTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (!webSocketClient.isOpen()) {
+                    System.out.println("Attempting to reconnect...");
+                    webSocketClient.reconnect();
+                } else if (webSocketClient.isOpen()) {
+                    reconnectTimer.cancel();
+                    isReconnecting = false; // Reset reconnecting flag when connection is reestablished
+                    System.out.println("WebSocket reconnected.");
+                } else {                     
+                    reconnectTimer.cancel();
+                    isReconnecting = false; // Reset reconnecting flag when user closes the connection
+                    System.out.println("WebSocket connection closed.");
+                }
+            }
+        }, 0, 5000);
     }
 
     // Send heartbeat message to the server
