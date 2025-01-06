@@ -51,7 +51,7 @@ public class WebSocketEventClient {
                         public void run() {
                             sendHeartbeat();
                         }
-                    }, 0, 10000); // Send heartbeat every 10 seconds
+                    }, 0, 5000); // Send heartbeat every 5 seconds
                 }
 
                 @Override
